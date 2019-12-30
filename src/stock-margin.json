@@ -1,0 +1,23 @@
+[
+  { "symbol": "SBIN", "margin": "12.5" },
+  { "symbol": "TATASTEEL", "margin": "12.5" },
+  { "symbol": "BPCL", "margin": "12.5" },
+  { "symbol": "IOC", "margin": "8.3" },
+  { "symbol": "JSWSTEEL", "margin": "12.5" },
+  { "symbol": "VEDL", "margin": "5" },
+  { "symbol": "UPL", "margin": "12.5" },
+  { "symbol": "COALINDIA", "margin": "12.5" },
+  { "symbol": "YESBANK", "margin": "3" },
+  { "symbol": "IBULHSGFIN", "margin": "3" },
+  { "symbol": "BAJFINANCE", "margin": "12.5" },
+  { "symbol": "RELIANCE", "margin": "12.5" },
+  { "symbol": "GRASIM", "margin": "12.5" },
+  { "symbol": "BAJAJFINSV", "margin": "12.5" },
+  { "symbol": "EICHERMOT", "margin": "12.5" },
+  { "symbol": "ZEEL", "margin": "5" },
+  { "symbol": "M&M", "margin": "12.5" },
+  { "symbol": "M&M", "margin": "12.5" },
+  { "symbol": "TATAMOTORS", "margin": "9" },
+  { "symbol": "SUNPHARMA", "margin": "5" },
+  { "symbol": "INDUSINDBK", "margin": "12.5" }
+]
