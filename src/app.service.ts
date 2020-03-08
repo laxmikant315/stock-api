@@ -9,58 +9,167 @@ import { ApiCallService } from './api-call.service';
 import { StockFeaturesService } from './stock-features.service';
 import { KiteService } from './kite.service';
 import { ZerodhaService } from './zerodha.service';
+import { Expo } from 'expo-server-sdk';
 
+import { jsonc } from 'jsonc';
+import { of } from 'rxjs';
+import e = require('express');
 @Injectable()
 export class AppService {
-  async getPriceAction(symbol: string) {
-    const instrumentToken = await this.kiteService.getInsruments(symbol);
+  data: any;
+  instruments: any;
+
+  async getProper(symbol: string) {
+    // const instrumentToken = await this.kiteService.getInsruments(symbol);
+    // const data = await this.zerodhaService.getHistorical(instrumentToken, "5minute", moment()
+    //   .format('YYYY-MM-DD') + '+09:15:00');
+    const data = this.data.concat();
+
+    const candels = [];
+    let firstCandel = data[0].concat();
+    firstCandel = this.fillCandelInfo(firstCandel);
+
+    candels.push(firstCandel);
+
+    for (let i = 0; i < data.length; i++) {
+      const candel = data[i];
+      const dataBetween = data.slice(firstCandel.index, i + 1);
+      if (dataBetween.length <= 2) {
+        continue;
+      }
+      const lowest = this.getLowestCandel(dataBetween);
+
+      if (candel[2] > (lowest[3] + ((candels[0][2] - lowest[3]) * 0.24))) {
+        candels.push(lowest);
+      }
+      if (candels[1]) {
+        candels[1] = this.fillCandelInfo(candels[1]);
+        const dataBetween1 = data.slice(candels[1].index, i + 1);
+        const highest = this.getHighestCandel(dataBetween1)
+        if (candel[3] < (highest[2] - ((highest[2] - candels[1][3]) * 0.24))) {
+          candels.push(highest);
+        }
+      }
+
+    }
+
+    return candels;
+
+
+  }
+  fillCandelInfo(candel: any): any {
+
+    if (candel[4] > candel[1]) {
+      candel.isGreen = true;
+    } else {
+      candel.isGreen = false;
+    }
+    candel.index = this.data.map(x => x[0]).indexOf(candel[0])
+
+    return candel;
+  }
+  getHighestCandel(dataBetween: any) {
+    let candel = dataBetween[0];
+    for (const item of dataBetween) {
+      if (item[2] > candel[2]) {
+        candel = item;
+
+      }
+    }
+    return candel
+  }
+  getLowestCandel(dataBetween: any) {
+    let candel = dataBetween[0];
+    for (const item of dataBetween) {
+      if (item[3] < candel[3]) {
+        candel = item
+
+      }
+    }
+    return candel
+  }
+
+  expo = new Expo();
+
+  tokens = [];
+  pushToken(body: any): any {
+    this.tokens.push(body.token.value);
+  }
+
+
+
+
+
+  async getPriceAction(instrumentToken: string) {
+
     const data = await this.zerodhaService.getHistorical(instrumentToken, "5minute", moment()
       .format('YYYY-MM-DD') + '+09:15:00')
 
-    const highestHigh = Math.max(...data.map(x => x[2]));
-    const lowestLow = Math.min(...data.map(x => x[3]));
+   const firstHourData = data.filter((x,i)=>i<12);
+  
+   const fhdHigh = this.getHighestHigh(firstHourData).highest;
+   const fhdLow = this.getLowestLow(firstHourData).lowest;
 
-    const highLowLength = Math.abs(highestHigh - lowestLow);
 
-    const highCandelIndex = data.indexOf(data.find(x => x[2] === highestHigh));
-    const lowCandelIndex = data.indexOf(data.find(x => x[3] === lowestLow));
-    const totalCandels = Math.abs(highCandelIndex - lowCandelIndex);
+
+    // const highestHigh = Math.max(...data.map(x => x[2]));
+
+    const highestHigh = this.getHighestHigh(data);
+
+    // const lowestLow = Math.min(...data.map(x => x[3]));
+    const lowestLow = this.getLowestLow(data);
+
+    const highLowLength = Math.abs(highestHigh.highest - lowestLow.lowest);
+
+    // const highCandelIndex = data.indexOf(data.find(x => x[2] === highestHigh));
+
+    // const lowCandelIndex = data.indexOf(data.find(x => x[3] === lowestLow));
+
+    const totalCandels = Math.abs(highestHigh.index - lowestLow.index) + 1;
     const per60 = Math.round(totalCandels * 50 / 100)
 
     let dataFirst60, dataLast60;
-    if (highCandelIndex < lowCandelIndex) {
-      dataFirst60 = data.slice(highCandelIndex, per60);
-      dataLast60 = data.slice(per60, lowCandelIndex);
+    let goingUp = false;
+    if (highestHigh.index < lowestLow.index) {
+      dataFirst60 = data.slice(highestHigh.index, highestHigh.index + per60 + 1);
+      dataLast60 = data.slice(lowestLow.index - per60, lowestLow.index + 1);
     } else {
-      dataFirst60 = data.slice(lowCandelIndex, per60);
-      dataLast60 = data.slice(per60, highCandelIndex);
+      goingUp = true;
+      dataFirst60 = data.slice(lowestLow.index, lowestLow.index + per60 + 1);
+      dataLast60 = data.slice(highestHigh.index - per60, highestHigh.index + 1);
     }
 
     const latestCandel = data[data.length - 1];
 
-    const firstHigh = Math.max(...dataFirst60.map(x => x[2]));
-    const firstLow = Math.min(...dataFirst60.map(x => x[3]));
+    // const firstHigh = Math.max(...dataFirst60.map(x => x[2]));
+    const firstHigh = this.getHighestHigh(dataFirst60, "FIRST", goingUp, goingUp ? lowestLow.index : highestHigh.index);
+    // const firstLow = Math.min(...dataFirst60.map(x => x[3]));
+    const firstLow = this.getLowestLow(dataFirst60, "FIRST", goingUp, goingUp ? lowestLow.index : highestHigh.index);
 
-    let lastHigh = Math.max(...dataLast60.map(x => x[2]));
+    // let lastHigh = Math.max(...dataLast60.map(x => x[2]));
+    let lastHigh = this.getHighestHigh(dataLast60, "LAST", goingUp, goingUp ? highestHigh.index : lowestLow.index);
+    // let lastLow = Math.min(...dataLast60.map(x => x[3]));
+    let lastLow = this.getLowestLow(dataLast60, "LAST", goingUp, goingUp ? highestHigh.index : lowestLow.index);
 
-    let lastLow = Math.min(...dataLast60.map(x => x[3]));
-
-    if (highCandelIndex < lowCandelIndex) {
-      const firstLowCandelIndex = data.indexOf(data.find(x => x[3] === firstLow));
-      const dataLast601 = data.slice(firstLowCandelIndex, lowCandelIndex)
-      lastHigh = Math.max(...dataLast601.map(x => x[2]));
+    if (highestHigh.index < lowestLow.index) {
+      // const firstLowCandelIndex = data.indexOf(data.find(x => x[3] === firstLow));
+      const dataLast601 = data.slice(firstLow.index + 1, lowestLow.index)
+      // lastHigh = Math.max(...dataLast601.map(x => x[2]));
+      lastHigh = this.getHighestHigh(dataLast601, "MID", goingUp, goingUp ? firstLow.index + 1 : lowestLow.index);
     } else {
-      const firstHighCandelIndex = data.indexOf(data.find(x => x[2] === firstHigh));
-      const dataLast601 = data.slice(firstHighCandelIndex, highCandelIndex)
-      lastLow = Math.min(...dataLast601.map(x => x[3]));
+      // const firstHighCandelIndex = data.indexOf(data.find(x => x[2] === firstHigh));
+
+      const dataLast601 = data.slice(firstHigh.index + 1, highestHigh.index)
+      // lastLow = Math.min(...dataLast601.map(x => x[3]));
+      lastLow = this.getLowestLow(dataLast601, "MID", goingUp, goingUp ? firstHigh.index + 1 : highestHigh.index);
     }
 
 
 
     let trend = 'SIDEBASE';
-    if (highestHigh > lastHigh && lowestLow < firstLow) {
+    if (highestHigh.highest > lastHigh.highest && lowestLow.lowest < firstLow.lowest) {
       trend = 'DOWN';
-    } else if (highestHigh > firstHigh && lowestLow < lastLow) {
+    } else if (highestHigh.highest > firstHigh.highest && lowestLow.lowest < lastLow.lowest) {
       trend = 'UP';
     }
 
@@ -68,19 +177,98 @@ export class AppService {
     let high = firstHigh, low = firstLow;
     const perGap60 = (highLowLength * 0.6)
     if (trend == "DOWN") {
-      valid = latestCandel[4] > lowestLow && latestCandel[4] < (lowestLow + perGap60)
+      valid = latestCandel[4] > lowestLow.lowest && latestCandel[4] < (lowestLow.lowest + perGap60)
       low = firstLow;
       high = lastHigh;
+      if (data.length - 1 <= lowestLow.index + 3) {
+        valid = false;
+      }
     }
     else if (trend == "UP") {
-      valid = latestCandel[4] < highestHigh && latestCandel[4] > (highestHigh - perGap60)
+      valid = latestCandel[4] < highestHigh.highest && latestCandel[4] > (highestHigh.highest - perGap60)
       high = firstHigh;
       low = lastLow;
+      if (data.length - 1 <= highestHigh.index + 3) {
+        valid = false;
+      }
     }
 
 
-    return { highestHigh, lowestLow, high, low, highCandelIndex, lowCandelIndex, totalCandels, per60, trend, valid, data }
+    if (
+      (!high || !low) ||
+      ( trend =='UP' && (highestHigh.highest<=fhdHigh && lowestLow.lowest <= fhdLow)) || 
+      trend =='DOWN' && (highestHigh.highest>=fhdHigh && lowestLow.lowest >= fhdLow)
+       ) {
 
+      valid = false;
+      trend = "SIDEBASE"
+    }
+
+    return { highestHigh, lowestLow, high, low, totalCandels, per60, trend, valid, firstHourData:{fhdHigh,fhdLow} }
+
+  }
+  getHighestHigh(data: any, type: any = "", goingUp: any = false, indexHigh: any = 0) {
+    let highest, index = 0;
+    if (data[0]) {
+      highest = data[0][2];
+    }
+
+    for (const item of data) {
+
+      if (item[2] > highest) {
+        highest = item[2]
+        index = data.indexOf(item);
+      }
+    }
+    if (type === 'FIRST' && !goingUp) {
+      index = indexHigh
+    }
+    else if (type === 'FIRST' && goingUp) {
+      index = index + indexHigh
+    }
+    else if (type === 'LAST' && goingUp) {
+      index = indexHigh
+    }
+    else if (type === 'LAST' && !goingUp) {
+      index = indexHigh - (data.length + index)
+    }
+    else if (type === 'MID' && goingUp) {
+      index = indexHigh
+    }
+    else if (type === 'MID' && !goingUp) {
+      index = indexHigh - data.length + index
+    }
+    return { highest, index }
+  }
+  getLowestLow(data: any, type: any = "", goingUp: any = false, indexLow: any = 0) {
+
+    let lowest, index = 0;
+    if (data[0]) {
+      lowest = data[0][3];
+    }
+
+    for (const item of data) {
+      if (item[3] < lowest) {
+        lowest = item[3]
+        index = data.indexOf(item);
+      }
+    }
+    if (type === 'FIRST' && goingUp) {
+      index = index + indexLow
+    } else if (type === 'FIRST' && !goingUp) {
+      index = indexLow + index;
+    } else if (type === 'LAST' && goingUp) {
+      index = indexLow - index + 1
+    } else if (type === 'LAST' && !goingUp) {
+      index = indexLow
+    }
+    else if (type === 'MID' && goingUp) {
+      index = indexLow + index;
+    }
+    else if (type === 'MID' && !goingUp) {
+      index = indexLow - (data.length + index)
+    }
+    return { lowest, index }
   }
   private logger = new Logger('AppService');
 
@@ -88,16 +276,133 @@ export class AppService {
 
   stockMargin: any;
   currentData: any[];
-
+  lastNotification = '';
   constructor(
     private apiService: ApiCallService,
     private kiteService: KiteService,
+    private http: HttpService,
     private zerodhaService: ZerodhaService,
     private stockFeaturesService: StockFeaturesService,
+
   ) {
+
+
+    let rawdata: any = fs.readFileSync(
+      path.join(__dirname, '/data.jsonc'),
+      'utf8',
+    );
+    this.data = jsonc.parse(rawdata);
+
+
+
     kiteService.getMargins().then(x => {
       this.stockMargin = x;
     });
+
+    kiteService.getInsruments().then(x => {
+      this.instruments = x;
+    });
+
+    setInterval(async () => {
+      let messages = [];
+      for (let pushToken of this.tokens) {
+        // Each push token looks like ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]
+
+        // Check that all your push tokens appear to be valid Expo push tokens
+        if (!Expo.isExpoPushToken(pushToken)) {
+          console.error(`Push token ${pushToken} is not a valid Expo push token`);
+          continue;
+        }
+
+        // Construct a message (see https://docs.expo.io/versions/latest/guides/push-notifications)
+
+        const dataVol = await this.getVolumeStocks();
+        if (dataVol && dataVol.length > 0) {
+          const stocks = dataVol.map((x: any) => x.nsecode).join(' & ');
+          const body = `Volume is showing for stock ` + stocks;
+          // if (this.lastNotification !== body) {
+          this.lastNotification = body;
+
+          messages.push({
+            to: pushToken,
+            sound: 'default',
+            body,
+            data: { stocks: dataVol }
+          });
+          // }
+
+
+        }
+
+
+
+      }
+
+
+
+      let chunks = this.expo.chunkPushNotifications(messages);
+      let tickets = [];
+      (async () => {
+        // Send the chunks to the Expo push notification service. There are
+        // different strategies you could use. A simple one is to send one chunk at a
+        // time, which nicely spreads the load out over time:
+        for (let chunk of chunks) {
+          try {
+            let ticketChunk = await this.expo.sendPushNotificationsAsync(chunk);
+            
+            tickets.push(...ticketChunk);
+            // NOTE: If a ticket contains an error code in ticket.details.error, you
+            // must handle it appropriately. The error codes are listed in the Expo
+            // documentation:
+            // https://docs.expo.io/versions/latest/guides/push-notifications#response-format
+          } catch (error) {
+            console.error(error);
+          }
+        }
+      })();
+
+      let receiptIds = [];
+      for (let ticket of tickets) {
+        // NOTE: Not all tickets have IDs; for example, tickets for notifications
+        // that could not be enqueued will have error information and no receipt ID.
+        if (ticket.id) {
+          receiptIds.push(ticket.id);
+        }
+      }
+
+      let receiptIdChunks = this.expo.chunkPushNotificationReceiptIds(receiptIds);
+      (async () => {
+        // Like sending notifications, there are different strategies you could use
+        // to retrieve batches of receipts from the Expo service.
+        for (let chunk of receiptIdChunks) {
+          try {
+            let receipts: any = await this.expo.getPushNotificationReceiptsAsync(chunk);
+       
+
+            // The receipts specify whether Apple or Google successfully received the
+            // notification and information about an error, if one occurred.
+            for (let receipt of receipts) {
+              if (receipt.status === 'ok') {
+                continue;
+              } else if (receipt.status === 'error') {
+                console.error(`There was an error sending a notification: ${receipt.message}`);
+                if (receipt.details && receipt.details.error) {
+                  // The error codes are listed in the Expo documentation:
+                  // https://docs.expo.io/versions/latest/guides/push-notifications#response-format
+                  // You must handle the errors appropriately.
+                  console.error(`The error code is ${receipt.details.error}`);
+                }
+              }
+            }
+          } catch (error) {
+            console.error(error);
+          }
+        }
+      })();
+    }, 20000)
+
+
+
   }
 
   // async getLiveInformation(stocks: string) {
@@ -145,10 +450,11 @@ export class AppService {
     }
 
 
-    const avg = total / data.length;
-    const lastCandelHeight = data[data.length - 1][5];
-    const goodOne = lastCandelHeight < (avg * 60 / 100)
-    return { avg, lastCandelHeight, goodOne, d: (avg * 60 / 100), data };
+    const avg = +(total / data.length).toFixed(2);
+    const lastCandelHeight = +(data[data.length - 1][5]).toFixed(2);
+    const allowedRange = +(avg * 70 / 100).toFixed(2);
+    const goodOne = lastCandelHeight < allowedRange
+    return { avg, lastCandelHeight, goodOne, allowedRange, data };
   }
 
 
@@ -305,8 +611,9 @@ export class AppService {
   }
 
   async getEquityInformation() {
-    const liveDataJ = await this.apiService.getLiveJuniorEquityStock();
+
     const liveData = await this.apiService.getLiveEquityStock();
+    const liveDataJ = await this.apiService.getLiveJuniorEquityStock();
     liveData.data = [...liveData.data, ...liveDataJ.data];
 
     // const equityDataRaw: any = fs.readFileSync(
@@ -314,11 +621,13 @@ export class AppService {
     // );
     // const liveData = JSON.parse(equityDataRaw);
 
-    const indicesLiveData = await this.apiService.getIndices();
-    const nifty50 = indicesLiveData.data.find(x => x.name === 'NIFTY 50');
+    // const indicesLiveData = await this.apiService.getIndices();
+    // const nifty50 = indicesLiveData.data.find(x => x.name === 'NIFTY 50');
 
-    const { change, pChange } = nifty50;
-    const nifty = { ptsC: change, per: pChange };
+    const nifty50 = liveData.metadata;
+
+    const { change, percChange } = nifty50;
+    const nifty = { ptsC: change, per: percChange };
     if (!this.currentData) {
       await this.getIntradayStocks();
     }
@@ -326,12 +635,12 @@ export class AppService {
       for (const x of this.currentData) {
         const live = liveData.data.find(a => a.symbol === x.symbol);
 
-        const { open, per, ptsC, ltP } = live;
+        const { open, pChange, change, lastPrice } = live;
 
-        x.per = per;
-        x.ptsC = ptsC.replace(',', '');
-        x.ltP = ltP.replace(',', '');
-        x.open = open.replace(',', '');
+        x.per = pChange;
+        x.ptsC = change;
+        x.ltP = lastPrice;
+        x.open = open;
       }
 
       this.currentData = this.currentData.sort((a, b) => b.per - a.per);
@@ -343,25 +652,32 @@ export class AppService {
     }
     return 'Data not available';
   }
+  async getVolumeStocksOnly() {
+    return await this.apiService.getVolumeStocks();
+  }
   async getVolumeStocks() {
     if (!this.currentData) {
       await this.getIntradayStocks();
     }
     let volumeStocks = await this.apiService.getVolumeStocks();
+
     volumeStocks = volumeStocks.filter(x =>
       this.currentData.map(y => y.symbol).includes(x.nsecode),
     );
     const final = [];
-    for (const stock of volumeStocks) {
-      const instrumentToken = await this.kiteService.getInsruments(stock.nsecode);
+    if (volumeStocks && volumeStocks.length > 0) {
+      for (const stock of volumeStocks) {
+        const instrumentToken = await this.kiteService.getInsruments(stock.nsecode);
 
-      const dayData = await this.getDayData(instrumentToken);
+        const dayData = await this.getDayData(instrumentToken);
 
-      const priceAction = await this.getPriceAction(stock.nsecode);
-      if (dayData.goodOne && priceAction.valid) {
-        final.push(stock);
+        const priceAction = await this.getPriceAction(instrumentToken);
+        if (dayData.goodOne && priceAction.valid) {
+          final.push(stock);
+        }
       }
     }
+
     return final;
   }
 
@@ -386,7 +702,7 @@ export class AppService {
       );
 
       const niftyVolatilited = dailyVolatilited.filter(x =>
-        niftyStocks.map(y => y.Symbol).includes(x.Symbol),
+        niftyStocks.map(y => y.symbol).includes(x.Symbol),
       );
 
       let final = [];
@@ -405,15 +721,15 @@ export class AppService {
         const live = liveData.data.find(a => a.symbol === x.Symbol);
         if (live) {
           const { daily } = x;
-          const { symbol, open, per, ptsC, ltP } = live;
+          const { symbol, open, pChange, change, lastPrice } = live;
 
           final.push({
             daily: +daily,
             symbol,
-            open: +open.replace(',', ''),
-            per: +per,
-            ltP: +ltP.replace(',', ''),
-            ptsC: +ptsC.replace(',', ''),
+            open: +open,
+            per: +pChange,
+            ltP: +lastPrice,
+            ptsC: +change,
           });
         }
       }
@@ -433,10 +749,16 @@ export class AppService {
 
       for (const x of final) {
         const margin = this.stockMargin.find(y => y.symbol === x.symbol);
+        const instrument = this.instruments.find(y => y.tradingsymbol.toUpperCase() === x.symbol.toUpperCase());
         if (margin) {
           x.margin = margin.margin;
         } else {
           x.margin = 'NA';
+        }
+        if (instrument) {
+          x.instrument = instrument.instrument_token;
+        } else {
+          x.instrument = "NA";
         }
         if (this.budgetPerStock / x.ltP < 10) {
           x.quantity = (this.budgetPerStock / x.ltP).toFixed();

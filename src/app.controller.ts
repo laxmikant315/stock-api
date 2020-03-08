@@ -1,9 +1,12 @@
-import { Controller, Get, Param, Optional } from '@nestjs/common';
+import { Controller, Get, Param, Optional, Post, Body } from '@nestjs/common';
 import { AppService } from './app.service';
 import { KiteService } from './kite.service';
 import { ZerodhaService } from './zerodha.service';
 
 import * as moment from 'moment-timezone';
+import { async } from 'rxjs/internal/scheduler/async';
+
+
 
 @Controller()
 export class AppController {
@@ -23,6 +26,23 @@ export class AppController {
     return this.appService.getIntradayStocks(lastTradeDate);
   }
 
+  @Post('pushToken')
+  pushToken(@Body() body: string): any {
+    return this.appService.pushToken(body);
+  }
+
+
+  @Get('getProper/:symbol')
+  getProper(@Param() symbol: string): any {
+    return this.appService.getProper(symbol);
+  }
+
+  @Get('getVolumeStocksOnly')
+  getVolumeStocksOnly(): any {
+    return this.appService.getVolumeStocksOnly();
+  }
+
+
   @Get('getIntradayStocks')
   getIntradayStocks1(): any {
     return this.appService.getIntradayStocks();
@@ -39,12 +59,33 @@ export class AppController {
     return this.appService.getDayData(instrumentToken)
   }
 
+
+
   @Get('GetPriceAction/:symbol')
   async GetPriceAction(@Param('symbol') symbol: string) {
-    return this.appService.getPriceAction(symbol);
+    const instrumentToken = await this.kiteService.getInsruments(symbol);
+
+    return this.appService.getPriceAction(instrumentToken);
   }
 
+  @Get('getStockDetails/:symbol')
+  async getStockDetails(@Param('symbol') symbol: string) {
+    const instrumentToken = await this.kiteService.getInsruments(symbol);
 
+    const priceAction = await this.appService.getPriceAction(instrumentToken);
+    const dayData = await this.appService.getDayData(instrumentToken);
+    const { goodOne, avg, lastCandelHeight, allowedRange } = dayData
+    const { trend, valid, highestHigh, lowestLow, high, low } = priceAction;
+    const data = {
+      goodOne, trend, valid,
+      avgCandelSize: avg,
+      todayCandelSize: lastCandelHeight,
+      allowedCandelSize: allowedRange,
+      highestHigh, lowestLow, high, low
+    }
+    return data;
+
+  }
 
   @Get('getLatest5MinutesData/:symbol')
   async getLatest5MinutesData(@Param('symbol') symbol: string) {

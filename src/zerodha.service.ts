@@ -27,7 +27,7 @@ export class ZerodhaService {
     to = moment().format('YYYY-MM-DD+HH:mm:ss'),
   ) {
     const url = `${this.zerodhaUrl}oms/instruments/historical/${instrumentToken}/${interval}?from=${from}&to=${to}`;
-
+  
     return await this.http
       .get(url, {
         headers: {

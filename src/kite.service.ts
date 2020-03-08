@@ -11,7 +11,7 @@ import * as fs from 'fs';
 export class KiteService {
   private logger = new Logger('KiteService');
   kiteConfig = config.get('kite');
-  constructor(private http: HttpService) {}
+  constructor(private http: HttpService) { }
 
   kiteUrl = this.kiteConfig.url;
   apiKey = this.kiteConfig.apiKey;
@@ -105,7 +105,7 @@ export class KiteService {
       .then(x => x.data.data);
   }
 
-  async getInsruments(symbol) {
+  async getInsruments(symbol?) {
     const data = await csv().fromFile(path.join(__dirname, 'instruments.csv'));
     if (symbol) {
       const stock = data.find(

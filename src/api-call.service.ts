@@ -7,15 +7,18 @@ import * as config from 'config';
 export class ApiCallService {
   private logger = new Logger('ApiCallService');
 
-  constructor(private http: HttpService) {}
+  constructor(private http: HttpService) { }
   chartintToken = config.get('chartintToken');
   chartintCookie = config.get('chartintCookie');
 
   keyIndex = 0;
   async getLiveEquityStock() {
     return await this.http
+      // .get(
+      //   'https://www.nseindia.com/live_market/dynaContent/live_watch/stock_watch/niftyStockWatch.json',
+      // )
       .get(
-        'https://www.nseindia.com/live_market/dynaContent/live_watch/stock_watch/niftyStockWatch.json',
+        'https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%2050',
       )
       .toPromise()
       .then(x => x.data);
@@ -23,8 +26,11 @@ export class ApiCallService {
 
   async getLiveJuniorEquityStock() {
     return await this.http
+      // .get(
+      //   'https://www.nseindia.com/live_market/dynaContent/live_watch/stock_watch/juniorNiftyStockWatch.json',
+      // )
       .get(
-        'https://www.nseindia.com/live_market/dynaContent/live_watch/stock_watch/juniorNiftyStockWatch.json',
+        'https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20NEXT%2050',
       )
       .toPromise()
       .then(x => x.data);
@@ -57,27 +63,29 @@ export class ApiCallService {
       .then(x => x.data.data);
   }
 
-  async getNifty50Stocks() {
-    const obj = await this.http
-      .get('https://www.nseindia.com/content/indices/ind_nifty50list.csv')
-      .toPromise();
+  // async getNifty50Stocks() {
+  //   const obj = await this.http
+  //     .get('https://www.nseindia.com/content/indices/ind_nifty50list.csv')
+  //     .toPromise();
 
-    const data = await csv().fromString(obj.data);
-    return data;
-  }
+  //   const data = await csv().fromString(obj.data);
+  //   return data;
+  // }
 
-  
+
   async getNifty100Stocks() {
     const obj = await this.http
-      .get('https://www.nseindia.com/content/indices/ind_nifty100list.csv')
+      // .get('https://www.nseindia.com/content/indices/ind_nifty100list.csv')
+      .get('https://www.nseindia.com/api/equity-stockIndices?index=NIFTY%20100')
       .toPromise();
 
-    const data = await csv().fromString(obj.data);
-    return data;
+    // const data = await csv().fromString(obj.data);
+    return obj.data.data;
   }
   async getDailyVolatilitedStocks(dateNow: string) {
     const obj = await this.http
-      .get(`https://www.nseindia.com/archives/nsccl/volt/CMVOLT_${dateNow}.CSV`)
+      // .get(`https://www.nseindia.com/archives/nsccl/volt/CMVOLT_${dateNow}.CSV`)
+      .get(`https://archives.nseindia.com/archives/nsccl/volt/CMVOLT_${dateNow}.CSV`)
       .toPromise();
 
     // const data = this.fetchData();
