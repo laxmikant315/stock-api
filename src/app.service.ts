@@ -100,17 +100,19 @@ export class AppService {
 
 
 
-  async getPriceAction(instrumentToken: string) {
+  async getPriceAction(instrumentToken: string,interval="5minute") {
 
-    const data = await this.zerodhaService.getHistorical(instrumentToken, "5minute", moment()
-      .format('YYYY-MM-DD') + '+09:15:00')
+    let from =""
+    if(interval==="5minute"){
+      from=moment()
+      .format('YYYY-MM-DD') + '+09:15:00'}
+      else if(interval==="day"){
+        from=moment().add(-60,"days")
+        .format('YYYY-MM-DD') + '+09:15:00'}
+      
+    const data = await this.zerodhaService.getHistorical(instrumentToken, interval, from)
 
-   const firstHourData = data.filter((x,i)=>i<12);
-  
-   const fhdHigh = this.getHighestHigh(firstHourData).highest;
-   const fhdLow = this.getLowestLow(firstHourData).lowest;
-
-
+ 
 
     // const highestHigh = Math.max(...data.map(x => x[2]));
 
@@ -194,6 +196,12 @@ export class AppService {
     }
 
 
+    const firstHourData = data.filter((x,i)=>i<12);
+  
+    const fhdHigh = this.getHighestHigh(firstHourData).highest;
+    const fhdLow = this.getLowestLow(firstHourData).lowest;
+ 
+ 
     if (
       (!high || !low) ||
       ( trend =='UP' && (highestHigh.highest<=fhdHigh && lowestLow.lowest <= fhdLow)) || 
@@ -439,8 +447,52 @@ export class AppService {
   //   return response;
   // }
 
-  async getDayData(instrumentToken) {
-    const data = await this.zerodhaService.getHistorical(instrumentToken, 'day');
+  async getDayData(instrumentToken,interval="day") {
+    let from =moment()
+    .add(-1, 'months')
+    .format('YYYY-MM-DD+HH:mm:ss');
+
+    let finalInterval=interval;
+    if(interval==="month"){
+      finalInterval="day"
+      from =moment()
+    .add(-65, 'months')
+    .format('YYYY-MM-DD+HH:mm:ss')
+    }
+    let data = await this.zerodhaService.getHistorical(instrumentToken, finalInterval,from);
+   
+    if(interval==='month'){
+
+      const bag=[];
+      for(let r of data){
+        
+        const monthYear =moment(r[0]).format('YYYY-MM')
+        if(!bag.find(x=>x[0]===monthYear))
+        {
+          bag.push([monthYear]);
+        }
+      }
+      for(let b of bag){
+     
+        const monthData = data.filter(x=> moment(x[0]).format('YYYY-MM') === b[0]);
+        const firstCandel=monthData[0];
+        const lastCandel=monthData[monthData.length-1];
+        
+        const maxData=monthData.map(x=>x[2]);
+        const minData=monthData.map(x=>x[3])
+        const volumnData=monthData.map(x=>x[5])
+
+        b[1]=firstCandel[1];
+        b[2]=Math.max(...maxData);
+        b[3]=Math.min(...minData);
+        b[4]=lastCandel[4];
+        b[5]=volumnData.reduce((x,y)=>x+y)
+      
+    }
+   
+    data=bag;
+    }
+
     for (const iterator of data) {
       iterator[5] = Math.abs(iterator[1] - iterator[4])
     }

@@ -5,10 +5,11 @@ import { ApiCallService } from './api-call.service';
 import { KiteService } from './kite.service';
 import { StockFeaturesService } from './stock-features.service';
 import { ZerodhaService } from './zerodha.service';
+import { SwingModule } from './swing/swing.module';
 
 
 @Module({
-  imports: [HttpModule],
+  imports: [HttpModule,SwingModule],
   controllers: [AppController],
   providers: [AppService, ApiCallService, KiteService, ZerodhaService, StockFeaturesService],
 })
