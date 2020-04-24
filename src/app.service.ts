@@ -195,6 +195,7 @@ export class AppService {
       }
     }
 
+   
 
     const firstHourData = data.filter((x,i)=>i<12);
   
@@ -212,7 +213,12 @@ export class AppService {
       trend = "SIDEBASE"
     }
 
-    return { highestHigh, lowestLow, high, low, totalCandels, per60, trend, valid, firstHourData:{fhdHigh,fhdLow} }
+    let lastCandelIsGreen=true;
+    if(latestCandel[1]>latestCandel[4]){
+      lastCandelIsGreen=false;
+    }
+    
+    return { highestHigh, lowestLow, high, low, totalCandels, per60, trend, valid, firstHourData:{fhdHigh,fhdLow},lastCandelIsGreen }
 
   }
   getHighestHigh(data: any, type: any = "", goingUp: any = false, indexHigh: any = 0) {

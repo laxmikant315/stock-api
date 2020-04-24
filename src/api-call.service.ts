@@ -42,13 +42,18 @@ export class ApiCallService {
       .toPromise()
       .then(x => x.data);
   }
-  async getVolumeStocks() {
+  async getVolumeStocks(interval="5minute") {
+    let scan_clause='%7B33619%7D+(+%5B+0+%5D+5+minute+volume+%3E+(+(+%5B+-1+%5D+5+minute+volume+%2B+%5B+-2+%5D+5+minute+volume+%2B+%5B+-3+%5D+5+minute+volume+)+%2F+3+)+*+2.5+)';
+    if(interval==='day'){
+      scan_clause='(+%7Bcash%7D+(+latest+volume+%3E+(+(+1+day+ago+volume+%2B+2+days+ago+volume+%2B+3+days+ago+volume+%2B+4+days+ago+volume+%2B+5+days+ago+volume+)+%2F+5+)+*+2+)+)+'
+    }
+
     return await this.http
       .post(
         'https://chartink.com/screener/process',
         // tslint:disable-next-line:max-line-length
-        'scan_clause=%7B33619%7D+(+%5B+0+%5D+5+minute+volume+%3E+(+(+%5B+-1+%5D+5+minute+volume+%2B+%5B+-2+%5D+5+minute+volume+%2B+%5B+-3+%5D+5+minute+volume+)+%2F+3+)+*+2.5+)',
-
+        `scan_clause=${scan_clause}`,
+       
         {
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
