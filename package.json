@@ -29,7 +29,7 @@
     "expo-server-sdk": "^3.4.0",
     "jsonc": "^2.0.0",
     "kiteconnect": "^3.0.2",
-    "moment": "^2.24.0",
+    "moment": "^2.29.2",
     "moment-timezone": "^0.5.26",
     "reflect-metadata": "^0.1.12",
     "rimraf": "^2.6.2",
