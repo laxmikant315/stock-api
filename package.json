@@ -23,7 +23,7 @@
     "@nestjs/common": "^6.0.0",
     "@nestjs/core": "^6.0.0",
     "@nestjs/platform-express": "^6.0.0",
-    "@nestjs/platform-socket.io": "^6.6.7",
+    "@nestjs/platform-socket.io": "^9.2.0",
     "config": "^3.2.2",
     "csvtojson": "^2.0.10",
     "expo-server-sdk": "^3.4.0",
